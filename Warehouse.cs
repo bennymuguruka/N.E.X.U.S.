@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace PRG_281_Project
 {
-    public class Warehouse
+    public class Warehouse: IMonitorable
     {
         public List<InventoryItem> Items { get; set; }
 
@@ -17,7 +17,7 @@ namespace PRG_281_Project
 
         public List<Vehicle> Vehicles { get; set; }
 
-        private Logger logger;
+        private ILogger logger;
 
         private WarehouseEvents events;
 
@@ -398,13 +398,16 @@ namespace PRG_281_Project
                 {
                     while (true)
                     {
-                        CheckItems();
-
-                        CheckVehicles();
+                        Monitor();
 
                         await Task.Delay(5000);
                     }
                 });
+        }
+        public void Monitor()
+        {
+            CheckItems();
+            CheckVehicles();
         }
 
 
