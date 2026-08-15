@@ -6,8 +6,6 @@ using System.Threading.Tasks;
 
 namespace PRG_281_Project
 {
-    internal class Interfaces
-    {
         public interface IDispatchable
         {
             void Dispatch();
@@ -22,5 +20,4 @@ namespace PRG_281_Project
         {
             void Log(string message);
         }
-    }
 }

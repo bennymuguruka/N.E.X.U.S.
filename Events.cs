@@ -6,19 +6,15 @@ using System.Threading.Tasks;
 
 namespace PRG_281_Project
 {
-    internal class Events
+    public delegate void WarehouseEventHandler(string message);
+
+    public class WarehouseEvents
     {
-        public delegate void WarehouseEventHandler(string message);
+        public event WarehouseEventHandler Alert;
 
-        public class WarehouseEvents
+        public void RaiseAlert(string message)
         {
-            public event WarehouseEventHandler Alert;
-
-            public void RaiseAlert(string message)
-            {
-                Alert?.Invoke(message);
-            }
+            Alert?.Invoke(message);
         }
-
     }
 }
