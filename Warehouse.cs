@@ -7,8 +7,10 @@ using System.Threading.Tasks;
 
 namespace PRG_281_Project
 {
-    public class Warehouse: IMonitorable
+    public class Warehouse : IMonitorable
     {
+        private readonly object syncLock = new object();
+
         public List<InventoryItem> Items { get; set; }
 
         public List<Order> Orders { get; set; }
@@ -146,20 +148,6 @@ namespace PRG_281_Project
                 int.Parse(Console.ReadLine());
 
 
-            InventoryItem item =
-                Items.FirstOrDefault(
-                    x => x.Id == itemId);
-
-
-            if (item == null)
-            {
-                Console.WriteLine(
-                    "Item not found.");
-
-                return;
-            }
-
-
             Console.Write(
                 "Enter quantity: ");
 
@@ -167,71 +155,93 @@ namespace PRG_281_Project
                 int.Parse(Console.ReadLine());
 
 
-            if (quantity > item.Quantity)
+            InventoryItem item;
+
+            Order order;
+
+
+            lock (syncLock)
             {
-                Console.WriteLine(
-                    "Not enough stock.");
+                item =
+                    Items.FirstOrDefault(
+                        x => x.Id == itemId);
 
-                return;
+
+                if (item == null)
+                {
+                    Console.WriteLine(
+                        "Item not found.");
+
+                    return;
+                }
+
+
+                if (quantity > item.Quantity)
+                {
+                    Console.WriteLine(
+                        "Not enough stock.");
+
+                    return;
+                }
+
+
+                InventoryItem orderItem;
+
+
+                // Polymorphism
+
+                if (item is PerishableItem)
+                {
+                    PerishableItem p =
+                        (PerishableItem)item;
+
+                    orderItem =
+                        new PerishableItem(
+                            p.Id,
+                            p.Name,
+                            p.Weight,
+                            quantity,
+                            p.Zone,
+                            p.ExpiryDate);
+                }
+                else if (item is FragileItem)
+                {
+                    orderItem =
+                        new FragileItem(
+                            item.Id,
+                            item.Name,
+                            item.Weight,
+                            quantity,
+                            item.Zone);
+                }
+                else
+                {
+                    orderItem =
+                        new BulkItem(
+                            item.Id,
+                            item.Name,
+                            item.Weight,
+                            quantity,
+                            item.Zone);
+                }
+
+
+                List<InventoryItem> orderItems =
+                    new List<InventoryItem>();
+
+                orderItems.Add(orderItem);
+
+
+                order =
+                    new Order(
+                        id,
+                        orderItems);
+
+
+                Orders.Add(order);
+
+                item.Quantity -= quantity;
             }
-
-
-            InventoryItem orderItem;
-
-
-            // Polymorphism
-
-            if (item is PerishableItem)
-            {
-                PerishableItem p =
-                    (PerishableItem)item;
-
-                orderItem =
-                    new PerishableItem(
-                        p.Id,
-                        p.Name,
-                        p.Weight,
-                        quantity,
-                        p.Zone,
-                        p.ExpiryDate);
-            }
-            else if (item is FragileItem)
-            {
-                orderItem =
-                    new FragileItem(
-                        item.Id,
-                        item.Name,
-                        item.Weight,
-                        quantity,
-                        item.Zone);
-            }
-            else
-            {
-                orderItem =
-                    new BulkItem(
-                        item.Id,
-                        item.Name,
-                        item.Weight,
-                        quantity,
-                        item.Zone);
-            }
-
-
-            List<InventoryItem> orderItems =
-                new List<InventoryItem>();
-
-            orderItems.Add(orderItem);
-
-
-            Order order =
-                new Order(
-                    id,
-                    orderItems);
-
-
-            Orders.Add(order);
-
-            item.Quantity -= quantity;
 
 
             logger.Log(
@@ -256,107 +266,119 @@ namespace PRG_281_Project
 
         public void ProcessOrders()
         {
-            Order order =
-                Orders.FirstOrDefault(
-                    x => x.Status ==
-                         OrderStatus.Pending);
+            Order order;
+
+            Vehicle vehicle;
 
 
-            if (order == null)
+            lock (syncLock)
             {
-                Console.WriteLine(
-                    "No pending orders.");
+                order =
+                    Orders.FirstOrDefault(
+                        x => x.Status ==
+                             OrderStatus.Pending);
 
-                return;
+
+                if (order == null)
+                {
+                    Console.WriteLine(
+                        "No pending orders.");
+
+                    return;
+                }
+
+
+                int availablePickers =
+                    Workers.Count(
+                        x => x is Picker &&
+                             x.Available);
+
+
+                int availableDrivers =
+                    Workers.Count(
+                        x => x is Driver &&
+                             x.Available);
+
+
+                // Workforce check
+
+                if (availablePickers < 
+            order.PickersNeeded)
+                {
+                    events.RaiseAlert(
+                        $"Workforce shortage: " +
+                        $"Order #{order.Id} needs " +
+                        $"{order.PickersNeeded} pickers.");
+
+                    return;
+                }
+
+
+                if (availableDrivers <
+            order.DriversNeeded)
+                {
+                    events.RaiseAlert(
+                        $"No driver available " +
+                        $"for Order #{order.Id}.");
+
+                    return;
+                }
+
+
+                // Pick order
+
+                order.Status =
+                    OrderStatus.Picking;
+
+                logger.Log(
+                    $"Order #{order.Id} is being picked.");
             }
 
-
-            int availablePickers =
-                Workers.Count(
-                    x => x is Picker &&
-                         x.Available);
-
-
-            int availableDrivers =
-                Workers.Count(
-                    x => x is Driver &&
-                         x.Available);
-
-
-            // Workforce check
-
-            if (availablePickers <
-                order.PickersNeeded)
-            {
-                events.RaiseAlert(
-                    $"Workforce shortage: " +
-                    $"Order #{order.Id} needs " +
-                    $"{order.PickersNeeded} pickers.");
-
-                return;
-            }
-
-
-            if (availableDrivers <
-                order.DriversNeeded)
-            {
-                events.RaiseAlert(
-                    $"No driver available " +
-                    $"for Order #{order.Id}.");
-
-                return;
-            }
-
-
-            // Pick order
-
-            order.Status =
-                OrderStatus.Picking;
-
-            logger.Log(
-                $"Order #{order.Id} is being picked.");
 
             Thread.Sleep(1000);
 
 
-            // Pack order
-
-            order.Status =
-                OrderStatus.Packed;
-
-            logger.Log(
-                $"Order #{order.Id} packed.");
-
-
-            // Find vehicle
-
-            Vehicle vehicle =
-                Vehicles.FirstOrDefault(
-                    x => x.Available &&
-                         x.Capacity >=
-                         order.GetTotalWeight());
-
-
-            if (vehicle == null)
+            lock (syncLock)
             {
-                events.RaiseAlert(
-                    "No suitable vehicle available.");
+                // Pack order
 
-                return;
+                order.Status =
+                    OrderStatus.Packed;
+
+                logger.Log(
+                    $"Order #{order.Id} packed.");
+
+
+                // Find vehicle
+
+                vehicle =
+                    Vehicles.FirstOrDefault(
+                        x => x.Available &&
+                             x.Capacity >=
+                             order.GetTotalWeight());
+
+
+                if (vehicle == null)
+                {
+                    events.RaiseAlert(
+                        "No suitable vehicle available.");
+
+                    return;
+                }
+
+
+                vehicle.Load(
+                    order.GetTotalWeight());
+
+                vehicle.Dispatch();
+
+
+                order.VehicleId =
+                    vehicle.Id;
+
+                order.Status =
+                    OrderStatus.Dispatched;
             }
-
-
-            vehicle.Load(
-                order.GetTotalWeight());
-
-            vehicle.Dispatch();
-
-
-            order.VehicleId =
-                vehicle.Id;
-
-            order.Status =
-                OrderStatus.Dispatched;
 
 
             events.RaiseAlert(
@@ -371,12 +393,15 @@ namespace PRG_281_Project
                 {
                     await Task.Delay(5000);
 
-                    order.Status =
-                        OrderStatus.Delivered;
+                    lock (syncLock)
+                    {
+                        order.Status =
+                            OrderStatus.Delivered;
 
-                    vehicle.Available = true;
+                        vehicle.Available = true;
 
-                    vehicle.CurrentLoad = 0;
+                        vehicle.CurrentLoad = 0;
+                    }
 
                     events.RaiseAlert(
                         $"Order #{order.Id} delivered.");
@@ -398,8 +423,10 @@ namespace PRG_281_Project
                 {
                     while (true)
                     {
-                        Monitor();
-
+                        lock (syncLock)
+                        {
+                            Monitor(); 
+                        }
                         await Task.Delay(5000);
                     }
                 });
