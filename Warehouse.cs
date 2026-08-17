@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace PRG_281_Project
+namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
 {
     public class Warehouse : IMonitorable
     {
@@ -24,7 +24,18 @@ namespace PRG_281_Project
         private WarehouseEvents events;
 
         public Warehouse()
+    : this(new ConsoleLogger())
         {
+
+        }
+
+        public Warehouse(ILogger logger)
+        {
+            if (logger is ConsoleLogger cl)
+            {
+                cl.OnLogged = entry => Console.Title = $"N.E.X.U.S. — {entry}";
+            }
+
             Items = new List<InventoryItem>();
 
             Orders = new List<Order>();
@@ -33,7 +44,7 @@ namespace PRG_281_Project
 
             Vehicles = new List<Vehicle>();
 
-            logger = new Logger();
+            this.logger = logger;
 
             events = new WarehouseEvents();
 
@@ -127,34 +138,135 @@ namespace PRG_281_Project
             }
         }
 
+        // =================================
+        // ADD ITEM
+        // =================================
 
+        public void AddItem()
+        {
+            Console.Write("\nEnter Item ID: ");
+            if (!int.TryParse(Console.ReadLine(), out int id))
+            {
+                Console.WriteLine("Invalid Item ID. Please enter a whole number.");
+                return;
+            }
+
+            lock (syncLock)
+            {
+                InventoryItem existing = Items.FirstOrDefault(x => x.Id == id);
+
+                if (existing != null)
+                {
+                    Console.Write($"Item #{id} ({existing.Name}) already exists. Enter quantity to add: ");
+                    if (!int.TryParse(Console.ReadLine(), out int addQty) || addQty <= 0)
+                    {
+                        Console.WriteLine("Invalid quantity. Please enter a whole number greater than 0.");
+                        return;
+                    }
+
+                    existing.Quantity += addQty;
+
+                    logger.Log($"Item #{id} ({existing.Name}) quantity increased by {addQty}. New total: {existing.Quantity}.");
+                    Console.WriteLine($"\nUpdated {existing.Name}: {existing.Quantity} units.");
+                    return;
+                }
+
+                Console.Write("Enter item name: ");
+                string name = Console.ReadLine();
+
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    Console.WriteLine("Item name cannot be empty.");
+                    return;
+                }
+
+                Console.Write("Enter weight (kg): ");
+                if (!double.TryParse(Console.ReadLine(), out double weight) || weight <= 0)
+                {
+                    Console.WriteLine("Invalid weight. Please enter a number greater than 0.");
+                    return;
+                }
+
+                Console.Write("Enter quantity: ");
+                if (!int.TryParse(Console.ReadLine(), out int quantity) || quantity <= 0)
+                {
+                    Console.WriteLine("Invalid quantity. Please enter a whole number greater than 0.");
+                    return;
+                }
+
+                Console.Write("Enter zone (e.g. A1): ");
+                string zone = Console.ReadLine();
+
+                if (string.IsNullOrWhiteSpace(zone))
+                {
+                    Console.WriteLine("Zone cannot be empty.");
+                    return;
+                }
+
+                Console.WriteLine("Item type: 1) Bulk  2) Perishable  3) Fragile");
+                Console.Write("Choose type: ");
+                string typeChoice = Console.ReadLine();
+
+                InventoryItem newItem;
+
+                switch (typeChoice)
+                {
+                    case "2":
+                        Console.Write("Enter expiry date (yyyy-MM-dd): ");
+                        if (!DateTime.TryParse(Console.ReadLine(), out DateTime expiry))
+                        {
+                            Console.WriteLine("Invalid date. Item not added.");
+                            return;
+                        }
+                        newItem = new PerishableItem(id, name, weight, quantity, zone, expiry);
+                        break;
+
+                    case "3":
+                        newItem = new FragileItem(id, name, weight, quantity, zone);
+                        break;
+
+                    default:
+                        newItem = new BulkItem(id, name, weight, quantity, zone);
+                        break;
+                }
+
+                Items.Add(newItem);
+
+                logger.Log($"Item #{id} ({newItem.Name}) added: {quantity} units, {weight}kg, Zone {zone}.");
+                Console.WriteLine($"\nItem #{id} ({newItem.Name}) added.");
+            }
+        }
         // =================================
         // CREATE ORDER
         // =================================
 
         public void CreateOrder()
-        {
-            Console.Write(
-                "\nEnter Order ID: ");
+        {Console.Write("\nEnter Order ID: ");
+            if (!int.TryParse(Console.ReadLine(), out int id))
+            {
+                Console.WriteLine("Invalid Order ID. Please enter a whole number.");
+                return;
+            }
 
-            int id =
-                int.Parse(Console.ReadLine());
+            if (Orders.Any(o => o.Id == id))
+            {
+                Console.WriteLine($"Order #{id} already exists. Choose a different ID.");
+                return;
+            }
 
+            Console.Write("Enter Item ID: ");
+            if (!int.TryParse(Console.ReadLine(), out int itemId))
+            {
+                Console.WriteLine("Invalid Item ID. Please enter a whole number.");
+                return;
+            }
 
-            Console.Write(
-                "Enter Item ID: ");
-
-            int itemId =
-                int.Parse(Console.ReadLine());
-
-
-            Console.Write(
-                "Enter quantity: ");
-
-            int quantity =
-                int.Parse(Console.ReadLine());
-
-
+            Console.Write("Enter quantity: ");
+            if (!int.TryParse(Console.ReadLine(), out int quantity) || quantity <= 0)
+            {
+                Console.WriteLine("Invalid quantity. Please enter a whole number greater than 0.");
+                return;
+            }
             InventoryItem item;
 
             Order order;
@@ -171,7 +283,7 @@ namespace PRG_281_Project
                 {
                     Console.WriteLine(
                         "Item not found.");
-
+                    logger.Log($"Order creation failed: Item #{itemId} not found.");
                     return;
                 }
 
@@ -180,7 +292,7 @@ namespace PRG_281_Project
                 {
                     Console.WriteLine(
                         "Not enough stock.");
-
+                    logger.Log($"Order creation failed: insufficient stock for Item #{itemId} (requested {quantity}, available {item.Quantity}).");
                     return;
                 }
 
@@ -425,13 +537,13 @@ namespace PRG_281_Project
                     {
                         lock (syncLock)
                         {
-                            Monitor(); 
+                            CheckStatus(); 
                         }
                         await Task.Delay(5000);
                     }
                 });
         }
-        public void Monitor()
+        public void CheckStatus()
         {
             CheckItems();
             CheckVehicles();
@@ -468,7 +580,7 @@ namespace PRG_281_Project
         {
             foreach (Vehicle vehicle in Vehicles)
             {
-                vehicle.Monitor();
+                vehicle.CheckStatus();
             }
         }
 

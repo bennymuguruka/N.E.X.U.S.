@@ -1,5 +1,4 @@
-﻿using PRG_281_Project;
-using Spectre.Console;
+﻿using Spectre.Console;
 using System;
 using System.Dynamic;
 using System.Linq; 
@@ -11,6 +10,7 @@ namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
         public enum MenuChoice
         {
             ViewInventory = 1,
+            AddItem,
             CreateOrder,
             ProcessOrder,
             ViewOrders,
@@ -23,13 +23,14 @@ namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
             AnsiConsole.Clear();
 
             AnsiConsole.Write(
-                new FigletText("[cyan]N.E.X.U.S.").Centered());
+                new FigletText("N.E.X.U.S.").Centered());
 
             AnsiConsole.MarkupLine("[grey]Warehouse & Logistics System[/]\n");
 
             var choice = AnsiConsole.Prompt( new SelectionPrompt<string>().Title("Choose an option: ").AddChoices(new[]
             {
                 "View Inventory",
+                "Add Item",
                 "Create Order",
                 "Process Order",
                 "View Orders",
@@ -41,6 +42,8 @@ namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
             {
                 case "View Inventory":
                     return MenuChoice.ViewInventory;
+                case "Add Item":
+                    return MenuChoice.AddItem;
                 case "Create Order":
                     return MenuChoice.CreateOrder;
                 case "Process Order":

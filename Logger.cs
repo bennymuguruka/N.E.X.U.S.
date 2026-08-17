@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Spectre.Console;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -6,8 +7,9 @@ using System.Text;
 using System.Threading.Tasks;
 
 
-namespace PRG_281_Project
+namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
 {
+    public delegate void LogHandler(string logEntry);
     public class Logger : ILogger
     {
         public void Log(string message)
@@ -44,6 +46,20 @@ namespace PRG_281_Project
             {
                 return new List<string>(entries);
             }
+        }
+    }
+
+    public class ConsoleLogger : ILogger
+    {
+        public LogHandler OnLogged;
+
+        public void Log(string message)
+        {
+            string text = $"[{DateTime.Now:HH:mm:ss}] {message}";
+
+            MonitorLog.Add($"[grey]{Markup.Escape(text)}[/]");
+
+            File.AppendAllText("nexus_log.txt", text + Environment.NewLine);
         }
     }
 }

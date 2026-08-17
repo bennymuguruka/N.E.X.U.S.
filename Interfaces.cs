@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace PRG_281_Project
+namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
 {
         public interface IDispatchable
         {
@@ -13,7 +13,7 @@ namespace PRG_281_Project
 
         public interface IMonitorable
         {
-            void Monitor();
+            void CheckStatus();
         }
 
         public interface ILogger

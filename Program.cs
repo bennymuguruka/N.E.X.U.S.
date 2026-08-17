@@ -1,12 +1,11 @@
-﻿using N.E.X.U.S_Warehouse_and_Logistics_Hub;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace PRG_281_Project
+namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
 {
     class Program
     {
@@ -30,8 +29,12 @@ namespace PRG_281_Project
                         case UI.MenuChoice.ViewInventory:
                             UI.ShowInventory(warehouse);
                             break;
-
+                        case UI.MenuChoice.AddItem:
+                            UI.ShowInventory(warehouse);
+                            warehouse.AddItem();
+                            break;
                         case UI.MenuChoice.CreateOrder:
+                            UI.ShowInventory(warehouse);
                             warehouse.CreateOrder();
                             break;
 
