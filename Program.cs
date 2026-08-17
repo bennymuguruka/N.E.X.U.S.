@@ -1,4 +1,5 @@
-﻿using System;
+﻿using N.E.X.U.S_Warehouse_and_Logistics_Hub;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -21,112 +22,43 @@ namespace PRG_281_Project
 
             while (running)
             {
-                Console.Clear();
-
-                Console.WriteLine(
-                    "================================");
-
-                Console.WriteLine(
-                    "       N.E.X.U.S.");
-
-                Console.WriteLine(
-                    " Warehouse & Logistics System");
-
-                Console.WriteLine(
-                    "================================");
-
-
-                Console.WriteLine(
-                    "\n1. View Inventory");
-
-                Console.WriteLine(
-                    "2. Create Order");
-
-                Console.WriteLine(
-                    "3. Process Order");
-
-                Console.WriteLine(
-                    "4. View Orders");
-
-                Console.WriteLine(
-                    "5. Exit");
-
-
-                Console.Write(
-                    "\nChoose: ");
-
-                string choice =
-                    Console.ReadLine();
-
-
+                var choice = UI.ShowMainMenu();
                 try
                 {
                     switch (choice)
                     {
-                        case "1":
-
-                            warehouse.ShowItems();
-
+                        case UI.MenuChoice.ViewInventory:
+                            UI.ShowInventory(warehouse);
                             break;
 
-
-                        case "2":
-
+                        case UI.MenuChoice.CreateOrder:
                             warehouse.CreateOrder();
-
                             break;
 
-
-                        case "3":
-
+                        case UI.MenuChoice.ProcessOrder:
                             warehouse.ProcessOrders();
-
                             break;
 
-
-                        case "4":
-
-                            foreach (Order order
-                                     in warehouse.Orders)
-                            {
-                                Console.WriteLine(
-                                    $"Order #{order.Id} - " +
-                                    $"{order.Status} - " +
-                                    $"Vehicle: " +
-                                    $"{order.VehicleId}");
-                            }
-
+                        case UI.MenuChoice.ViewOrders:
+                            UI.ShowOrders(warehouse);
                             break;
 
+                        case UI.MenuChoice.Dashboard:
+                            UI.ShowDashboard(warehouse);
+                            break;
 
-                        case "5":
-
+                        case UI.MenuChoice.Exit:
                             running = false;
-
-                            break;
-
-
-                        default:
-
-                            Console.WriteLine(
-                                "Invalid option.");
-
                             break;
                     }
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine(
-                        $"ERROR: {ex.Message}");
+                    UI.ShowError(ex.Message);
                 }
-
-
                 if (running)
                 {
-                    Console.WriteLine(
-                        "\nPress ENTER...");
-
-                    Console.ReadLine();
+                    UI.Pause();
                 }
             }
         }

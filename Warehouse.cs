@@ -475,16 +475,10 @@ namespace PRG_281_Project
 
         private void HandleAlert(string message)
         {
-            Console.ForegroundColor =
-                ConsoleColor.Yellow;
 
-            Console.WriteLine(
-                $"\n[EVENT] {message}");
-
-            Console.ResetColor();
-
-            logger.Log(
-                $"EVENT: {message}");
+            MonitorLog.Add($"[yellow][[EVENT]] {message}[/]");
+            logger.Log($"EVENT: {message}");
         }
+
     }
 }

@@ -49,8 +49,7 @@ namespace PRG_281_Project
 
         public void Monitor()
         {
-            Console.WriteLine(
-                $"{Id}: {CurrentLoad}/{Capacity}kg");
+            MonitorLog.Add($"{Id}: {CurrentLoad}/{Capacity}kg");
         }
     }
 
