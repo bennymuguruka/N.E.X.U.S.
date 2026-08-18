@@ -241,7 +241,8 @@ namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
         // =================================
 
         public void CreateOrder()
-        {Console.Write("\nEnter Order ID: ");
+        {
+            Console.Write("\nEnter Order ID: ");
             if (!int.TryParse(Console.ReadLine(), out int id))
             {
                 Console.WriteLine("Invalid Order ID. Please enter a whole number.");
@@ -254,105 +255,63 @@ namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
                 return;
             }
 
-            Console.Write("Enter Item ID: ");
-            if (!int.TryParse(Console.ReadLine(), out int itemId))
+            var requestedItems = new Dictionary<int, int>();
+            while (true)
             {
-                Console.WriteLine("Invalid Item ID. Please enter a whole number.");
-                return;
+                Console.Write("Enter Item ID (press Enter when finished): ");
+                string itemInput = Console.ReadLine();
+                if (string.IsNullOrWhiteSpace(itemInput)) break;
+
+                int itemId;
+                if (!int.TryParse(itemInput, out itemId))
+                {
+                    Console.WriteLine("Invalid Item ID. Please enter a whole number.");
+                    continue;
+                }
+
+                Console.Write("Enter quantity: ");
+                int quantity;
+                if (!int.TryParse(Console.ReadLine(), out quantity) || quantity <= 0)
+                {
+                    Console.WriteLine("Invalid quantity. Please enter a whole number greater than 0.");
+                    continue;
+                }
+
+                requestedItems[itemId] = requestedItems.ContainsKey(itemId)
+                    ? requestedItems[itemId] + quantity : quantity;
             }
 
-            Console.Write("Enter quantity: ");
-            if (!int.TryParse(Console.ReadLine(), out int quantity) || quantity <= 0)
+            if (requestedItems.Count == 0)
             {
-                Console.WriteLine("Invalid quantity. Please enter a whole number greater than 0.");
+                Console.WriteLine("An order must contain at least one item.");
                 return;
             }
-            InventoryItem item;
 
             Order order;
-
-
             lock (syncLock)
             {
-                item =
-                    Items.FirstOrDefault(
-                        x => x.Id == itemId);
-
-
-                if (item == null)
+                foreach (var request in requestedItems)
                 {
-                    Console.WriteLine(
-                        "Item not found.");
-                    logger.Log($"Order creation failed: Item #{itemId} not found.");
-                    return;
+                    InventoryItem item = Items.FirstOrDefault(x => x.Id == request.Key);
+                    if (item == null || request.Value > item.Quantity)
+                    {
+                        string reason = item == null ? "not found" : "insufficient stock";
+                        Console.WriteLine(item == null ? "Item not found." : "Not enough stock.");
+                        logger.Log($"Order creation failed: Item #{request.Key} {reason}.");
+                        return;
+                    }
                 }
 
-
-                if (quantity > item.Quantity)
+                var orderItems = new List<InventoryItem>();
+                foreach (var request in requestedItems)
                 {
-                    Console.WriteLine(
-                        "Not enough stock.");
-                    logger.Log($"Order creation failed: insufficient stock for Item #{itemId} (requested {quantity}, available {item.Quantity}).");
-                    return;
+                    InventoryItem item = Items.First(x => x.Id == request.Key);
+                    orderItems.Add(CreateOrderItem(item, request.Value));
+                    item.Quantity -= request.Value;
                 }
 
-
-                InventoryItem orderItem;
-
-
-                // Polymorphism
-
-                if (item is PerishableItem)
-                {
-                    PerishableItem p =
-                        (PerishableItem)item;
-
-                    orderItem =
-                        new PerishableItem(
-                            p.Id,
-                            p.Name,
-                            p.Weight,
-                            quantity,
-                            p.Zone,
-                            p.ExpiryDate);
-                }
-                else if (item is FragileItem)
-                {
-                    orderItem =
-                        new FragileItem(
-                            item.Id,
-                            item.Name,
-                            item.Weight,
-                            quantity,
-                            item.Zone);
-                }
-                else
-                {
-                    orderItem =
-                        new BulkItem(
-                            item.Id,
-                            item.Name,
-                            item.Weight,
-                            quantity,
-                            item.Zone);
-                }
-
-
-                List<InventoryItem> orderItems =
-                    new List<InventoryItem>();
-
-                orderItems.Add(orderItem);
-
-
-                order =
-                    new Order(
-                        id,
-                        orderItems);
-
-
+                order = new Order(id, orderItems);
                 Orders.Add(order);
-
-                item.Quantity -= quantity;
             }
 
 
@@ -379,148 +338,127 @@ namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
         public void ProcessOrders()
         {
             Order order;
-
             Vehicle vehicle;
-
 
             lock (syncLock)
             {
-                order =
-                    Orders.FirstOrDefault(
-                        x => x.Status ==
-                             OrderStatus.Pending);
-
-
+                order = GetNextPendingOrder();
                 if (order == null)
                 {
-                    Console.WriteLine(
-                        "No pending orders.");
-
+                    Console.WriteLine("No pending orders.");
                     return;
                 }
 
-
-                int availablePickers =
-                    Workers.Count(
-                        x => x is Picker &&
-                             x.Available);
-
-
-                int availableDrivers =
-                    Workers.Count(
-                        x => x is Driver &&
-                             x.Available);
-
-
-                // Workforce check
-
-                if (availablePickers < 
-            order.PickersNeeded)
+                try
                 {
-                    events.RaiseAlert(
-                        $"Workforce shortage: " +
-                        $"Order #{order.Id} needs " +
-                        $"{order.PickersNeeded} pickers.");
-
-                    return;
+                    AllocateWorkers(order);
                 }
-
-
-                if (availableDrivers <
-            order.DriversNeeded)
+                catch (WorkforceShortageException exception)
                 {
-                    events.RaiseAlert(
-                        $"No driver available " +
-                        $"for Order #{order.Id}.");
-
+                    events.RaiseAlert(exception.Message);
+                    logger.Log(exception.Message);
                     return;
                 }
 
-
-                // Pick order
-
-                order.Status =
-                    OrderStatus.Picking;
-
-                logger.Log(
-                    $"Order #{order.Id} is being picked.");
+                StartPicking(order);
             }
-
 
             Thread.Sleep(1000);
 
-
             lock (syncLock)
             {
-                // Pack order
-
-                order.Status =
-                    OrderStatus.Packed;
-
-                logger.Log(
-                    $"Order #{order.Id} packed.");
-
-
-                // Find vehicle
-
-                vehicle =
-                    Vehicles.FirstOrDefault(
-                        x => x.Available &&
-                             x.Capacity >=
-                             order.GetTotalWeight());
-
-
+                PackOrder(order);
+                vehicle = FindSuitableVehicle(order);
                 if (vehicle == null)
                 {
-                    events.RaiseAlert(
-                        "No suitable vehicle available.");
-
+                    ReleaseWorkers(order);
+                    order.Status = OrderStatus.Pending;
+                    events.RaiseAlert("No suitable vehicle available.");
                     return;
                 }
 
-
-                vehicle.Load(
-                    order.GetTotalWeight());
-
-                vehicle.Dispatch();
-
-
-                order.VehicleId =
-                    vehicle.Id;
-
-                order.Status =
-                    OrderStatus.Dispatched;
+                DispatchOrder(order, vehicle);
             }
 
+            events.RaiseAlert($"Order #{order.Id} departed using {vehicle.Id}.");
+            CompleteDeliveryAsync(order, vehicle);
+        }
 
-            events.RaiseAlert(
-                $"Order #{order.Id} departed " +
-                $"using {vehicle.Id}.");
+        private InventoryItem CreateOrderItem(InventoryItem item, int quantity)
+        {
+            PerishableItem perishable = item as PerishableItem;
+            if (perishable != null)
+                return new PerishableItem(perishable.Id, perishable.Name, perishable.Weight, quantity, perishable.Zone, perishable.ExpiryDate);
+            if (item is FragileItem)
+                return new FragileItem(item.Id, item.Name, item.Weight, quantity, item.Zone);
+            return new BulkItem(item.Id, item.Name, item.Weight, quantity, item.Zone);
+        }
 
+        private Order GetNextPendingOrder()
+        {
+            return Orders.FirstOrDefault(x => x.Status == OrderStatus.Pending);
+        }
 
-            // Simulate delivery
+        private void AllocateWorkers(Order order)
+        {
+            var pickers = Workers.Where(x => x is Picker && x.Available).Take(order.PickersNeeded).ToList();
+            var drivers = Workers.Where(x => x is Driver && x.Available).Take(order.DriversNeeded).ToList();
+            if (pickers.Count < order.PickersNeeded || drivers.Count < order.DriversNeeded)
+                throw new WorkforceShortageException($"Workforce shortage for Order #{order.Id}: requires {order.PickersNeeded} picker(s) and {order.DriversNeeded} driver(s).");
 
-            Task.Run(
-                async () =>
+            order.AssignedWorkers = pickers.Concat(drivers).ToList();
+            foreach (Worker worker in order.AssignedWorkers)
+                worker.Available = false;
+        }
+
+        private void ReleaseWorkers(Order order)
+        {
+            foreach (Worker worker in order.AssignedWorkers)
+                worker.Available = true;
+            order.AssignedWorkers.Clear();
+        }
+
+        private void StartPicking(Order order)
+        {
+            order.Status = OrderStatus.Picking;
+            logger.Log($"Order #{order.Id} is being picked.");
+        }
+
+        private void PackOrder(Order order)
+        {
+            order.Status = OrderStatus.Packed;
+            logger.Log($"Order #{order.Id} packed.");
+        }
+
+        private Vehicle FindSuitableVehicle(Order order)
+        {
+            return Vehicles.FirstOrDefault(x => x.Available && x.Capacity >= order.GetTotalWeight());
+        }
+
+        private void DispatchOrder(Order order, Vehicle vehicle)
+        {
+            vehicle.Load(order.GetTotalWeight());
+            vehicle.Dispatch();
+            order.VehicleId = vehicle.Id;
+            order.Status = OrderStatus.Dispatched;
+        }
+
+        private void CompleteDeliveryAsync(Order order, Vehicle vehicle)
+        {
+            Task.Run(async () =>
+            {
+                await Task.Delay(5000);
+                lock (syncLock)
                 {
-                    await Task.Delay(5000);
+                    order.Status = OrderStatus.Delivered;
+                    vehicle.Available = true;
+                    vehicle.CurrentLoad = 0;
+                    ReleaseWorkers(order);
+                }
 
-                    lock (syncLock)
-                    {
-                        order.Status =
-                            OrderStatus.Delivered;
-
-                        vehicle.Available = true;
-
-                        vehicle.CurrentLoad = 0;
-                    }
-
-                    events.RaiseAlert(
-                        $"Order #{order.Id} delivered.");
-
-                    logger.Log(
-                        $"Order #{order.Id} completed.");
-                });
+                events.RaiseAlert($"Order #{order.Id} delivered.");
+                logger.Log($"Order #{order.Id} completed.");
+            });
         }
 
 

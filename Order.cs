@@ -31,12 +31,15 @@ namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
 
         public string VehicleId { get; set; }
 
+        public List<Worker> AssignedWorkers { get; set; }
+
         public Order(
             int id,
             List<InventoryItem> items)
         {
             Id = id;
             Items = items;
+            AssignedWorkers = new List<Worker>();
 
             Status = OrderStatus.Pending;
 
