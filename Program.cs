@@ -14,55 +14,62 @@ namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
             Warehouse warehouse = new Warehouse();
 
             warehouse.StartMonitoring();
-
-
             bool running = true;
-
-
-            while (running)
+            try
             {
-                var choice = UI.ShowMainMenu();
-                try
+                while (running)
                 {
-                    switch (choice)
+                    var choice = UI.ShowMainMenu();
+                    try
                     {
-                        case UI.MenuChoice.ViewInventory:
-                            UI.ShowInventory(warehouse);
-                            break;
-                        case UI.MenuChoice.AddItem:
-                            UI.ShowInventory(warehouse);
-                            warehouse.AddItem();
-                            break;
-                        case UI.MenuChoice.CreateOrder:
-                            UI.ShowInventory(warehouse);
-                            warehouse.CreateOrder();
-                            break;
-
-                        case UI.MenuChoice.ProcessOrder:
-                            warehouse.ProcessOrders();
-                            break;
-
-                        case UI.MenuChoice.ViewOrders:
-                            UI.ShowOrders(warehouse);
-                            break;
-
-                        case UI.MenuChoice.Dashboard:
-                            UI.ShowDashboard(warehouse);
-                            break;
-
-                        case UI.MenuChoice.Exit:
-                            running = false;
-                            break;
+                        switch (choice)
+                        {
+                            case UI.MenuChoice.ViewInventory:
+                                UI.ShowInventory(warehouse);
+                                break;
+                            case UI.MenuChoice.AddItem:
+                                UI.ShowInventory(warehouse);
+                                warehouse.AddItem();
+                                break;
+                            case UI.MenuChoice.UpdateItem:
+                                UI.ShowInventory(warehouse);
+                                warehouse.UpdateItem();
+                                break;
+                            case UI.MenuChoice.RemoveItem:
+                                UI.ShowInventory(warehouse);
+                                warehouse.RemoveItem();
+                                break;
+                            case UI.MenuChoice.CreateOrder:
+                                UI.ShowInventory(warehouse);
+                                warehouse.CreateOrder();
+                                break;
+                            case UI.MenuChoice.ProcessOrder:
+                                warehouse.ProcessOrders();
+                                break;
+                            case UI.MenuChoice.ViewOrders:
+                                UI.ShowOrders(warehouse);
+                                break;
+                            case UI.MenuChoice.Dashboard:
+                                UI.ShowDashboard(warehouse);
+                                break;
+                            case UI.MenuChoice.Exit:
+                                running = false;
+                                break;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        UI.ShowError(ex.Message);
+                    }
+                    if (running)
+                    {
+                        UI.Pause();
                     }
                 }
-                catch (Exception ex)
-                {
-                    UI.ShowError(ex.Message);
-                }
-                if (running)
-                {
-                    UI.Pause();
-                }
+            }
+            finally
+            {
+                warehouse.StopMonitoring();
             }
         }
     }

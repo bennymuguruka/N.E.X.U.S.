@@ -11,6 +11,8 @@ namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
         {
             ViewInventory = 1,
             AddItem,
+            UpdateItem,
+            RemoveItem,
             CreateOrder,
             ProcessOrder,
             ViewOrders,
@@ -31,6 +33,8 @@ namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
             {
                 "View Inventory",
                 "Add Item",
+                "Update Item",
+                "Remove Item",
                 "Create Order",
                 "Process Order",
                 "View Orders",
@@ -44,6 +48,10 @@ namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
                     return MenuChoice.ViewInventory;
                 case "Add Item":
                     return MenuChoice.AddItem;
+                case "Update Item":
+                    return MenuChoice.UpdateItem;
+                case "Remove Item":
+                    return MenuChoice.RemoveItem;
                 case "Create Order":
                     return MenuChoice.CreateOrder;
                 case "Process Order":

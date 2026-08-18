@@ -51,7 +51,7 @@ namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
 
     public class ConsoleLogger : ILogger
     {
-        public LogHandler OnLogged;
+        public event LogHandler Logged;
 
         public void Log(string message)
         {
@@ -60,6 +60,7 @@ namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
             MonitorLog.Add($"[grey]{Markup.Escape(text)}[/]");
 
             File.AppendAllText("nexus_log.txt", text + Environment.NewLine);
+            Logged?.Invoke(text);
         }
     }
 }

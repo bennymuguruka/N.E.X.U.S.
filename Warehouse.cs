@@ -10,6 +10,9 @@ namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
     public class Warehouse : IMonitorable
     {
         private readonly object syncLock = new object();
+        private readonly Random random = new Random();
+        private readonly HashSet<string> raisedMonitoringAlerts = new HashSet<string>();
+        private CancellationTokenSource monitoringCancellation;
 
         public List<InventoryItem> Items { get; set; }
 
@@ -33,7 +36,7 @@ namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
         {
             if (logger is ConsoleLogger cl)
             {
-                cl.OnLogged = entry => Console.Title = $"N.E.X.U.S. — {entry}";
+                cl.Logged += entry => Console.Title = $"N.E.X.U.S. — {entry}";
             }
 
             Items = new List<InventoryItem>();
@@ -49,6 +52,8 @@ namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
             events = new WarehouseEvents();
 
             events.Alert += HandleAlert;
+            events.OrderDispatched += HandleOrderDispatched;
+            events.OrderDelivered += HandleOrderDelivered;
 
             CreateData();
         }
@@ -62,25 +67,25 @@ namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
                 new BulkItem(
                     1,
                     "Rice",
-                    5,
-                    10,
+                    random.Next(3, 8),
+                    random.Next(8, 21),
                     "A1"));
 
             Items.Add(
                 new PerishableItem(
                     2,
                     "Milk",
-                    2,
-                    10,
+                    random.Next(1, 4),
+                    random.Next(8, 21),
                     "A2",
-                    DateTime.Now.AddMinutes(5)));
+                    DateTime.Now.AddMinutes(random.Next(5, 31))));
 
             Items.Add(
                 new FragileItem(
                     3,
                     "Glass",
-                    3,
-                    5,
+                    random.Next(2, 6),
+                    random.Next(4, 16),
                     "A3"));
 
 
@@ -115,6 +120,88 @@ namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
 
             logger.Log(
                 "N.E.X.U.S. started.");
+        }
+
+        public void UpdateItem()
+        {
+            Console.Write("\nEnter Item ID to update: ");
+            int id;
+            if (!int.TryParse(Console.ReadLine(), out id))
+            {
+                Console.WriteLine("Invalid Item ID.");
+                return;
+            }
+
+            lock (syncLock)
+            {
+                InventoryItem item = Items.FirstOrDefault(x => x.Id == id);
+                if (item == null)
+                {
+                    Console.WriteLine("Item not found.");
+                    return;
+                }
+
+                Console.Write($"Name ({item.Name}, press Enter to keep): ");
+                string name = Console.ReadLine();
+                string updatedName = string.IsNullOrWhiteSpace(name) ? item.Name : name;
+
+                Console.Write($"Weight ({item.Weight}kg, press Enter to keep): ");
+                string weightInput = Console.ReadLine();
+                double updatedWeight = item.Weight;
+                if (!string.IsNullOrWhiteSpace(weightInput))
+                {
+                    double weight;
+                    if (!double.TryParse(weightInput, out weight) || weight <= 0)
+                    {
+                        Console.WriteLine("Invalid weight. Item was not changed.");
+                        return;
+                    }
+                    updatedWeight = weight;
+                }
+
+                Console.Write($"Zone ({item.Zone}, press Enter to keep): ");
+                string zone = Console.ReadLine();
+                string updatedZone = string.IsNullOrWhiteSpace(zone) ? item.Zone : zone;
+
+                item.Name = updatedName;
+                item.Weight = updatedWeight;
+                item.Zone = updatedZone;
+
+                logger.Log($"Item #{item.Id} updated.");
+                Console.WriteLine("Item updated.");
+            }
+        }
+
+        public void RemoveItem()
+        {
+            Console.Write("\nEnter Item ID to remove: ");
+            int id;
+            if (!int.TryParse(Console.ReadLine(), out id))
+            {
+                Console.WriteLine("Invalid Item ID.");
+                return;
+            }
+
+            lock (syncLock)
+            {
+                InventoryItem item = Items.FirstOrDefault(x => x.Id == id);
+                if (item == null)
+                {
+                    Console.WriteLine("Item not found.");
+                    return;
+                }
+
+                Console.Write($"Remove {item.Name}? Type YES to confirm: ");
+                if (!string.Equals(Console.ReadLine(), "YES", StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.WriteLine("Removal cancelled.");
+                    return;
+                }
+
+                Items.Remove(item);
+                logger.Log($"Item #{id} ({item.Name}) removed.");
+                Console.WriteLine("Item removed.");
+            }
         }
 
 
@@ -338,7 +425,6 @@ namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
         public void ProcessOrders()
         {
             Order order;
-            Vehicle vehicle;
 
             lock (syncLock)
             {
@@ -363,25 +449,54 @@ namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
                 StartPicking(order);
             }
 
-            Thread.Sleep(1000);
+            CompletePickingAndDispatchAsync(order);
+            Console.WriteLine($"Order #{order.Id} is being processed in the background.");
+        }
 
-            lock (syncLock)
+        private void CompletePickingAndDispatchAsync(Order order)
+        {
+            Task.Run(async () =>
             {
-                PackOrder(order);
-                vehicle = FindSuitableVehicle(order);
-                if (vehicle == null)
+                await Task.Delay(1000);
+                Vehicle vehicle = null;
+                try
                 {
-                    ReleaseWorkers(order);
-                    order.Status = OrderStatus.Pending;
-                    events.RaiseAlert("No suitable vehicle available.");
-                    return;
+                    lock (syncLock)
+                    {
+                        PackOrder(order);
+                        vehicle = FindSuitableVehicle(order);
+                        if (vehicle == null)
+                        {
+                            ReleaseWorkers(order);
+                            order.Status = OrderStatus.Pending;
+                        }
+                        else
+                        {
+                            DispatchOrder(order, vehicle);
+                        }
+                    }
+
+                    if (vehicle == null)
+                    {
+                        events.RaiseAlert($"No suitable vehicle available for Order #{order.Id}.");
+                        return;
+                    }
+
+                    events.RaiseOrderDispatched($"Order #{order.Id} departed using {vehicle.Id}.");
+                    CompleteDeliveryAsync(order, vehicle);
                 }
+                catch (Exception exception)
+                {
+                    lock (syncLock)
+                    {
+                        ReleaseWorkers(order);
+                        order.Status = OrderStatus.Failed;
+                    }
 
-                DispatchOrder(order, vehicle);
-            }
-
-            events.RaiseAlert($"Order #{order.Id} departed using {vehicle.Id}.");
-            CompleteDeliveryAsync(order, vehicle);
+                    events.RaiseAlert($"Order #{order.Id} processing failed: {exception.Message}");
+                    logger.Log($"Order #{order.Id} processing failed: {exception.Message}");
+                }
+            });
         }
 
         private InventoryItem CreateOrderItem(InventoryItem item, int quantity)
@@ -456,8 +571,7 @@ namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
                     ReleaseWorkers(order);
                 }
 
-                events.RaiseAlert($"Order #{order.Id} delivered.");
-                logger.Log($"Order #{order.Id} completed.");
+                events.RaiseOrderDelivered($"Order #{order.Id} delivered.");
             });
         }
 
@@ -468,18 +582,37 @@ namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
 
         public void StartMonitoring()
         {
-            Task.Run(
-                async () =>
+            if (monitoringCancellation != null) return;
+
+            monitoringCancellation = new CancellationTokenSource();
+            CancellationToken token = monitoringCancellation.Token;
+            Task.Run(async () =>
+            {
+                try
                 {
-                    while (true)
+                    while (!token.IsCancellationRequested)
                     {
                         lock (syncLock)
                         {
-                            CheckStatus(); 
+                            CheckStatus();
                         }
-                        await Task.Delay(5000);
+                        await Task.Delay(5000, token);
                     }
-                });
+                }
+                catch (TaskCanceledException)
+                {
+                    // Normal shutdown path.
+                }
+            });
+        }
+
+        public void StopMonitoring()
+        {
+            if (monitoringCancellation == null) return;
+
+            monitoringCancellation.Cancel();
+            monitoringCancellation.Dispose();
+            monitoringCancellation = null;
         }
         public void CheckStatus()
         {
@@ -499,16 +632,14 @@ namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
 
                     if (p.IsExpired())
                     {
-                        events.RaiseAlert(
-                            $"Item {p.Name} has expired.");
+                        RaiseMonitoringAlertOnce($"expired-{p.Id}", $"Item {p.Name} has expired.");
                     }
                 }
 
 
                 if (item.Quantity <= 2)
                 {
-                    events.RaiseAlert(
-                        $"Low stock: {item.Name}");
+                    RaiseMonitoringAlertOnce($"low-stock-{item.Id}", $"Low stock: {item.Name}");
                 }
             }
         }
@@ -525,9 +656,26 @@ namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
 
         private void HandleAlert(string message)
         {
-
             MonitorLog.Add($"[yellow][[EVENT]] {message}[/]");
             logger.Log($"EVENT: {message}");
+        }
+
+        private void HandleOrderDispatched(string message)
+        {
+            MonitorLog.Add($"[blue][[DISPATCHED]] {message}[/]");
+            logger.Log(message);
+        }
+
+        private void HandleOrderDelivered(string message)
+        {
+            MonitorLog.Add($"[green][[DELIVERED]] {message}[/]");
+            logger.Log(message);
+        }
+
+        private void RaiseMonitoringAlertOnce(string key, string message)
+        {
+            if (raisedMonitoringAlerts.Add(key))
+                events.RaiseAlert(message);
         }
 
     }
