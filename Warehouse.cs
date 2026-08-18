@@ -441,6 +441,8 @@ namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
                     return;
                 }
 
+                SplitOrderForWorkforceIfNeeded(order);
+
                 try
                 {
                     AllocateWorkers(order);
@@ -512,6 +514,68 @@ namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
             if (item is FragileItem)
                 return new FragileItem(item.Id, item.Name, item.Weight, quantity, item.Zone);
             return new BulkItem(item.Id, item.Name, item.Weight, quantity, item.Zone);
+        }
+
+        private void SplitOrderForWorkforceIfNeeded(Order order)
+        {
+            int totalPickers = Workers.Count(worker => worker is Picker);
+            if (order.PickersNeeded <= totalPickers || totalPickers == 0)
+                return;
+
+            double maximumBatchWeight = totalPickers * 7;
+            if (order.Items.Any(item => item.Weight > maximumBatchWeight))
+                return;
+
+            var batches = new List<List<InventoryItem>>();
+            var currentBatch = new List<InventoryItem>();
+            double currentWeight = 0;
+
+            foreach (InventoryItem item in order.Items)
+            {
+                int remainingQuantity = item.Quantity;
+                while (remainingQuantity > 0)
+                {
+                    int quantityThatFits = (int)Math.Floor((maximumBatchWeight - currentWeight) / item.Weight);
+                    if (quantityThatFits == 0)
+                    {
+                        batches.Add(currentBatch);
+                        currentBatch = new List<InventoryItem>();
+                        currentWeight = 0;
+                        continue;
+                    }
+
+                    int batchQuantity = Math.Min(remainingQuantity, quantityThatFits);
+                    currentBatch.Add(CreateOrderItem(item, batchQuantity));
+                    currentWeight += item.Weight * batchQuantity;
+                    remainingQuantity -= batchQuantity;
+                }
+            }
+
+            if (currentBatch.Count > 0)
+                batches.Add(currentBatch);
+
+            if (batches.Count <= 1)
+                return;
+
+            order.Items = batches[0];
+            order.RecalculateWorkers();
+
+            int insertionIndex = Orders.IndexOf(order) + 1;
+            var orderIds = new List<int> { order.Id };
+            for (int index = 1; index < batches.Count; index++)
+            {
+                int splitOrderId = GetNextAvailableOrderId();
+                Orders.Insert(insertionIndex++, new Order(splitOrderId, batches[index]));
+                orderIds.Add(splitOrderId);
+            }
+
+            events.RaiseAlert(
+                $"Order #{orderIds[0]} required more than {totalPickers} picker(s) and was split into sequential orders: {string.Join(", ", orderIds.Select(id => "#" + id))}.");
+        }
+
+        private int GetNextAvailableOrderId()
+        {
+            return Orders.Count == 0 ? 1 : Orders.Max(order => order.Id) + 1;
         }
 
         private Order GetNextPendingOrder()

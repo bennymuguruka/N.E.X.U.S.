@@ -1,4 +1,4 @@
-﻿using Spectre.Console;
+using Spectre.Console;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -12,13 +12,17 @@ namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
     public delegate void LogHandler(string logEntry);
     public class Logger : ILogger
     {
+        private static readonly string LogFilePath = Path.Combine(
+            AppDomain.CurrentDomain.BaseDirectory,
+            "nexus_log.txt");
+
         public void Log(string message)
         {
             string text = $"[{DateTime.Now:HH:mm:ss}] {message}";
 
             Console.WriteLine(text);
 
-            File.AppendAllText("nexus_log.txt", text + Environment.NewLine);
+            File.AppendAllText(LogFilePath, text + Environment.NewLine);
         }
     }
 
@@ -53,11 +57,15 @@ namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
     {
         public event LogHandler Logged;
 
+        private static readonly string LogFilePath = Path.Combine(
+            AppDomain.CurrentDomain.BaseDirectory,
+            "nexus_log.txt");
+
         public void Log(string message)
         {
             string text = $"[{DateTime.Now:HH:mm:ss}] {message}";
 
-            File.AppendAllText("nexus_log.txt", text + Environment.NewLine);
+            File.AppendAllText(LogFilePath, text + Environment.NewLine);
             Logged?.Invoke(text);
         }
     }

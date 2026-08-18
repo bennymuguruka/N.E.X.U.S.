@@ -43,7 +43,7 @@ namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
 
             Status = OrderStatus.Pending;
 
-            CalculateWorkers();
+            RecalculateWorkers();
         }
 
         public double GetTotalWeight()
@@ -52,7 +52,7 @@ namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
                 item => item.Weight * item.Quantity);
         }
 
-        private void CalculateWorkers()
+        public void RecalculateWorkers()
         {
             double weight = GetTotalWeight();
 

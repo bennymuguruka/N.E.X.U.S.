@@ -137,7 +137,7 @@ namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
                 .BorderColor(Color.Green);
 
             var logPanel = new Panel(string.Join("\n", MonitorLog.GetRecent()))
-                .Header("[bold]Vehicle Monitor Log[/]")
+                .Header("[bold]Monitor Log[/]")
                 .BorderColor(Color.Grey);
 
             // Top row: workforce + utilization chart side by side
