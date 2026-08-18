@@ -572,6 +572,11 @@ namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
                 }
 
                 events.RaiseOrderDelivered($"Order #{order.Id} delivered.");
+
+                // A completed delivery frees the vehicle and workers reserved for
+                // this order. Start the next queued order now that resources may
+                // be available instead of requiring another menu action.
+                ProcessOrders();
             });
         }
 
