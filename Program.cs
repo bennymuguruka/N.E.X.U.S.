@@ -45,7 +45,7 @@ namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
                                 break;
                             case UI.MenuChoice.ProcessOrder:
                                 warehouse.ProcessOrders();
-                                break;
+                                continue;
                             case UI.MenuChoice.ViewOrders:
                                 UI.ShowOrders(warehouse);
                                 break;

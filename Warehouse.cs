@@ -424,6 +424,11 @@ namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
 
         public void ProcessOrders()
         {
+            StartNextPendingOrder(true);
+        }
+
+        private void StartNextPendingOrder(bool notifyWhenNoPending)
+        {
             Order order;
 
             lock (syncLock)
@@ -431,7 +436,8 @@ namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
                 order = GetNextPendingOrder();
                 if (order == null)
                 {
-                    Console.WriteLine("No pending orders.");
+                    if (notifyWhenNoPending)
+                        events.RaiseAlert("No pending orders to process.");
                     return;
                 }
 
@@ -450,7 +456,6 @@ namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
             }
 
             CompletePickingAndDispatchAsync(order);
-            Console.WriteLine($"Order #{order.Id} is being processed in the background.");
         }
 
         private void CompletePickingAndDispatchAsync(Order order)
@@ -536,7 +541,9 @@ namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
         private void StartPicking(Order order)
         {
             order.Status = OrderStatus.Picking;
-            logger.Log($"Order #{order.Id} is being picked.");
+            string message = $"Order #{order.Id} is being processed.";
+            MonitorLog.Add($"[yellow][[PROCESSING]] {message}[/]");
+            logger.Log(message);
         }
 
         private void PackOrder(Order order)
@@ -576,7 +583,7 @@ namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
                 // A completed delivery frees the vehicle and workers reserved for
                 // this order. Start the next queued order now that resources may
                 // be available instead of requiring another menu action.
-                ProcessOrders();
+                StartNextPendingOrder(false);
             });
         }
 

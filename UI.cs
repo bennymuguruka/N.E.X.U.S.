@@ -29,45 +29,44 @@ namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
 
             AnsiConsole.MarkupLine("[grey]Warehouse & Logistics System[/]\n");
 
-            var choice = AnsiConsole.Prompt( new SelectionPrompt<string>().Title("Choose an option: ").AddChoices(new[]
-            {
-                "View Inventory",
-                "Add Item",
-                "Update Item",
-                "Remove Item",
-                "Create Order",
-                "Process Order",
-                "View Orders",
-                "Dashboard",
-                "Exit"
-            }));
+            var menuOptions = new Markup(
+                "[bold cyan]1.[/] View Inventory\n" +
+                "[bold cyan]2.[/] Add Item\n" +
+                "[bold cyan]3.[/] Update Item\n" +
+                "[bold cyan]4.[/] Remove Item\n" +
+                "[bold cyan]5.[/] Create Order\n" +
+                "[bold cyan]6.[/] Process Order\n" +
+                "[bold cyan]7.[/] View Orders\n" +
+                "[bold cyan]8.[/] Dashboard\n" +
+                "[bold cyan]9.[/] Exit");
 
-            switch (choice)
-            {
-                case "View Inventory":
-                    return MenuChoice.ViewInventory;
-                case "Add Item":
-                    return MenuChoice.AddItem;
-                case "Update Item":
-                    return MenuChoice.UpdateItem;
-                case "Remove Item":
-                    return MenuChoice.RemoveItem;
-                case "Create Order":
-                    return MenuChoice.CreateOrder;
-                case "Process Order":
-                    return MenuChoice.ProcessOrder;
-                case "View Orders":
-                    return MenuChoice.ViewOrders;
-                case "Dashboard":
-                    return MenuChoice.Dashboard;
-                default:
-                    return MenuChoice.Exit;
-            }
+            var recentEvents = MonitorLog.GetRecent();
+            string eventContent = recentEvents.Count == 0
+                ? "[grey]No alerts or events yet.[/]"
+                : string.Join("\n", recentEvents);
+
+            var eventPanel = new Panel(new Markup(eventContent))
+                .Header("[bold yellow]Alerts & Events[/]")
+                .BorderColor(Color.Yellow)
+                .Expand();
+
+            AnsiConsole.Write(new Columns(menuOptions, eventPanel));
+            AnsiConsole.WriteLine();
+
+            int choice = AnsiConsole.Prompt(
+                new TextPrompt<int>("[bold]Choose an option (1-9):[/]")
+                    .Validate(value => value >= (int)MenuChoice.ViewInventory && value <= (int)MenuChoice.Exit
+                        ? ValidationResult.Success()
+                        : ValidationResult.Error("[red]Enter a number from 1 to 9.[/]")));
+
+            AnsiConsole.Clear();
+            return (MenuChoice)choice;
 
         }
 
         public static void ShowInventory(Warehouse warehouse)
         {
+            AnsiConsole.Write(new Rule("[bold cyan]N.E.X.U.S.[/]").Centered());
             var table = new Table().Expand();
             table.Title("[bold]Inventory[/]");
             table.AddColumn("ID");
@@ -95,6 +94,7 @@ namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
 
         public static void ShowOrders(Warehouse warehouse)
         {
+            AnsiConsole.Write(new Rule("[bold cyan]N.E.X.U.S.[/]").Centered());
             var table = new Table().Expand();
             table.Title("[bold]Order[/]");
             table.AddColumn("ID");

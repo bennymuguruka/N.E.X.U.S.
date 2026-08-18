@@ -57,8 +57,6 @@ namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
         {
             string text = $"[{DateTime.Now:HH:mm:ss}] {message}";
 
-            MonitorLog.Add($"[grey]{Markup.Escape(text)}[/]");
-
             File.AppendAllText("nexus_log.txt", text + Environment.NewLine);
             Logged?.Invoke(text);
         }

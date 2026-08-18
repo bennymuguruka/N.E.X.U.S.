@@ -42,14 +42,12 @@ namespace N.E.X.U.S_Warehouse_and_Logistics_Hub
         public void Dispatch()
         {
             Available = false;
-
-            Console.WriteLine(
-                $"Vehicle {Id} dispatched.");
         }
 
         public void CheckStatus()
         {
-            MonitorLog.Add($"{Id}: {CurrentLoad}/{Capacity}kg");
+            // Vehicle capacity and availability are shown in the dashboard,
+            // not in the Alerts & Events panel.
         }
     }
 
